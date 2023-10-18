@@ -1,4 +1,4 @@
-# Statistical Analysis Tests for Disease Prediction from Symptoms
+# Statistical Analysis Tests for Disease Diagnosis
 
 Modern technologies and new devices are present in the doctor's office. Those are used to facilitate the appointment and the diagnosis increasing the assurance level of the diagnosis. One of the biggest issues are the misdiagnosis and the wrong relationship between the symptom and disease. 
 
