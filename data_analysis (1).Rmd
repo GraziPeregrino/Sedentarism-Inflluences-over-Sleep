@@ -1,0 +1,266 @@
+---
+title: "Project-statistics"
+author: "Graziano Peregrino Cezario"
+date: "2023-12-01"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(tidyverse)
+library(lmerTest)
+```
+```{r}
+library(readr)
+project <- fread("/Users/grazianoperegrino/Desktop/statistic_project/explore (1).csv")
+cleaned <- fread("/Users/grazianoperegrino/Desktop/statistic_project/Dataset/cleaned.csv")
+colnames(cleaned)
+```
+```{r}
+cleaned$ParticipantF <- as.factor(cleaned$PARTICIPANT)
+cleaned$SexF <- as.factor(cleaned$Sex)
+str(cleaned)
+```
+```{r}
+sum_hours_by_participant <- cleaned %>%
+  group_by(ParticipantF, group) %>%
+  summarize(total_sum_hours = sum(Sum_hours)) %>%
+  arrange(desc(total_sum_hours))
+```
+```{r}
+cleaned$PARTICIPANT <- factor(cleaned$ParticipantF, levels = sum_hours_by_participant$ParticipantF)
+cleaned$Group_Color <- ifelse(cleaned$group == "Treatment", "red", "blue")
+
+```
+
+```{r}
+sum_hours_per_participant <- ggplot(sum_hours_by_participant, 
+                                    aes(x = reorder(ParticipantF, -total_sum_hours), 
+                                        y = total_sum_hours, fill = group)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Sum of Hours by Participant",
+       x = "Participant ID",
+       y = "Total Hours per Participant", 
+       fill = "Group") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r}
+ggsave("plot_1.png", sum_hours_per_participant, width = 10, height = 6, units = "in")
+
+```
+```{r}
+cleaned %>% ggplot(aes(x= ParticipantF, y=Sleep, fill = SexF)) +                 
+  geom_boxplot() +
+    labs(title = "Contribution of Each Participant ",
+       x = "Participant ID",
+       y = "Hours Slept per Day", 
+       fill = "Sex") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
+cleaned %>% ggplot(aes(x= ParticipantF, y=Sleep, , fill = SexF)) +                 
+  geom_boxplot()+ 
+  labs(title = "Participant Sex / Group",
+       x = "Participant ID",
+       y = "Hours Slept per Day", 
+       fill = "Sex") + 
+  facet_grid(SexF~group) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+```{r}
+project$groupF <- factor(project$group)
+project$SexF <- factor(project$Sex)
+str(project)
+
+```
+
+```{r}
+library(lme4)
+```
+
+```{r}
+boxplot(Sleep ~ group * Sex,  
+        col = c("White", "lightgray"), project)
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+
+project %>% ggplot(aes(x= group, y=Sleep)) +
+                geom_boxplot() 
+
+project %>% ggplot(aes(x= group, y=Sleep)) +
+                geom_boxplot() +
+                facet_grid(.~PARTICIPANT)
+
+project %>% ggplot(aes(x= group, y=Sleep)) +
+                geom_boxplot() +
+                facet_grid(.~Sex)
+
+```
+Syntax
+model = lmer(target ~ fixed1 + fixed2+  (1|random1), data=data)
+
+# An Example of Linear Mixed Model 
+```{r}
+project.model = lmer(Sleep ~ groupF +
+                                    (1|PARTICIPANT), 
+                                    data=project, REML = F)
+project.model
+```
+```{r}
+project.model = lmer(Sleep ~ groupF + SexF +
+                                    groupF:SexF +
+                                    (1|PARTICIPANT), 
+                                    data=project)
+project.model
+```
+
+```{r}
+mean(project[project$SexF == "Female",]$Sleep)
+
+model <- lm(Sleep ~ groupF + SexF, project)
+summary(model)
+```
+
+```{r}
+project.null = lmer(Sleep ~ groupF + SexF +
+                                    (1|PARTICIPANT), 
+                                    data=project)
+project.null
+```
+```{r}
+anova(project.null,project.model)
+```
+# Random slopes versus random intercepts
+
+```{r}
+coef(project.model)
+```
+
+```{r}
+project.model = lmer( Sleep ~ group + Sex + 
+                            (1 + group | PARTICIPANT),
+                            data = project,
+                            REML = F)
+
+```
+
+```{r}
+coef(project.model)
+```
+
+```{r}
+
+project.null = lmer( Sleep ~ groupF + SexF +
+                            (1 | PARTICIPANT),
+                            data = project)
+
+```
+```{r}
+plot(fitted(project.model), residuals(project.model))^2
+```
+linearity assumption is violated. 
+
+```{r}
+hist(residuals(project.model))
+```
+```{r}
+qqnorm(residuals(project.model))
+```
+No violation of the normality assumption 
+
+### Absence of influential data points 
+
+```{r}
+
+```
+
+```{r}
+anova(project.null,project.model)
+```
+
+```{r}
+m0 <- lmer(Sleep ~ groupF * SexF + (1|PARTICIPANT), data = project, REML = F)
+m1 <- lmer(Sleep ~ groupF + SexF + groupF:SexF + (1 |PARTICIPANT), data = project, REML = F)
+m2 <- lmer(Sleep ~ groupF + SexF + (1|PARTICIPANT), data = project, REML = F)
+m3 <- lmer(Sleep ~ groupF + (1|PARTICIPANT), data = project, REML = F)
+m4 <- lmer(Sleep ~ SexF + (1|PARTICIPANT), data = project, REML = F)
+m5 <- lmer(Sleep ~ 1 + (1|PARTICIPANT), data = project, REML = F)
+```
+
+```{r}
+library(bbmle)
+m <- c(m0,m1,m2,m3,m4, m5)
+AICctab(m , base = T, weights = T, sort = T)
+```
+```{r}
+
+
+par(mfrow = c(1, 2))
+plot(project$groupF, residuals(m2), main = "Fixed Predictor 1 vs. Residuals", xlab = "Fixed Predictor 1", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+plot(project$SexF, residuals(m2), main = "Fixed Predictor 2 vs. Residuals", xlab = "Fixed Predictor 2", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+# Check linearity of random effects
+plot(fitted(m2), residuals(m2), main = "Fitted Values vs. Residuals", xlab = "Fitted Values", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+boxplot(Sleep ~ SexF, data = project, col = "lightblue", main = "Boxplot of Response by Fixed Effect")
+
+# Statistical comparison using t-test
+t_test_result <- t.test(Sleep ~ groupF, data = project)
+
+# Print the results
+print(t_test_result)
+```
+data 
+
+```{r}
+library(RVAideMemoire)
+```
+```{r}
+plotresid(m2, shapiro = T)
+```
+```{r}
+plotresid(m2, shapiro = T)
+```
+```{r}
+plotresid(m3, shapiro = T)
+```
+```{r}
+library(forecast)
+```
+```{r}
+resi <- residuals(project.model)
+ts_res <- ts(resi, start = 1, frequency = 1)
+pacf(resi, main = "PACF Plot for Residuals", lag.max = 20)
+
+
+
+```
+
+
+```{r}
+qqmath(ranef(m2, condVar = TRUE), strip=FALSE)$PARTICIPANT
+```
+```{r}
+ggplot(project, aes(x = PARTICIPANT, y = Sleep)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F, color = "red", linetype = "dashed") +
+  theme_bw() +
+  labs(y = "Frequency\n(Sleep)")
+```
+
+
